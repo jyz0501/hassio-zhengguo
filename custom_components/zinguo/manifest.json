@@ -1,6 +1,4 @@
 
-### **custom_components/zinguo/manifest.json**
-```json
 {
   "domain": "zinguo",
   "name": "Zinguo Bathroom Fan",
