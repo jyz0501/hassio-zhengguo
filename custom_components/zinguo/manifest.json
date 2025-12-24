@@ -1,0 +1,14 @@
+
+### **custom_components/zinguo/manifest.json**
+```json
+{
+  "domain": "zinguo",
+  "name": "Zinguo Bathroom Fan",
+  "documentation": "https://github.com/jyz0501/hassio-zinguo",
+  "dependencies": [],
+  "codeowners": ["@jyz0501"],
+  "requirements": ["aiohttp>=3.8.0"],
+  "config_flow": true,
+  "version": "1.0.0",
+  "iot_class": "cloud_polling"
+}
