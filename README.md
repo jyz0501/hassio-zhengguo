@@ -1,3 +1,5 @@
+# Zinguo Bathroom Fan Home Assistant Add-on
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 Zinguo 浴霸 Home Assistant 集成
 一个完整的 Zinguo 智能浴霸 Home Assistant 集成。通过用户友好的界面和安全凭证存储，提供对您浴霸的完整控制。
 
