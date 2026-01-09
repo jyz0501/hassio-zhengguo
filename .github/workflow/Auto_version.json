@@ -1,1 +1,9 @@
 
+{
+  "schemaVersion": 1,
+  "label": "version",
+  "message": "v1.0.0", 
+  "color": "blue",
+  "targetUrl": "https://github.com/jyz0501/hassio-zinguo/blob/main/{PATH_TO_MANIFEST}",
+  "url": "https://github.com/jyz0501/hassio-zinguo/releases"
+}
