@@ -20,7 +20,7 @@ class ZinguoWarmingSwitch1(SwitchEntity):
         self.coordinator = coordinator
         self._device_info = device_info
         self._api = api
-        self._attr_unique_id = f"{DOMAIN}_{device_info['id']}_warming_switch_1"
+        self._attr_unique_id = f"{device_info['id']}_warming_switch_1"
         self._attr_name = f"{device_info.get('name', 'Zinguo Device')} Warming Switch 1"
         self._attr_available = True
         self._state = False # 初始状态
@@ -76,7 +76,7 @@ class ZinguoWarmingSwitch2(SwitchEntity):
         self.coordinator = coordinator
         self._device_info = device_info
         self._api = api
-        self._attr_unique_id = f"{DOMAIN}_{device_info['id']}_warming_switch_2"
+        self._attr_unique_id = f"{device_info['id']}_warming_switch_2"
         self._attr_name = f"{device_info.get('name', 'Zinguo Device')} Warming Switch 2"
         self._attr_available = True
         self._state = False
@@ -126,7 +126,7 @@ class ZinguoWindSwitch(SwitchEntity):
         self.coordinator = coordinator
         self._device_info = device_info
         self._api = api
-        self._attr_unique_id = f"{DOMAIN}_{device_info['id']}_wind_switch"
+        self._attr_unique_id = f"{device_info['id']}_warming_switch"
         self._attr_name = f"{device_info.get('name', 'Zinguo Device')} Wind Switch"
         self._attr_available = True
         self._state = False
