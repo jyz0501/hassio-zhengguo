@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "label": "version",
+  "message": "v1.0.0", // 这只是一个占位符，实际值由 targetUrl 决定
+  "color": "blue",
+  "targetUrl": "https://github.com/jyz0501/hassio-zinguo/blob/main/{PATH_TO_MANIFEST}",
+  "url": "https://github.com/jyz0501/hassio-zinguo/releases"
+}
