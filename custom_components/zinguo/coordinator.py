@@ -18,7 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 class ZinguoDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching Zinguo data."""
 
-    def __init__(self, hass, account, password, mac, name):
+    def __init__(self, hass, username, password, mac, name):
         """Initialize."""
         super().__init__(
             hass,
@@ -26,7 +26,8 @@ class ZinguoDataUpdateCoordinator(DataUpdateCoordinator):
             name=name,
             update_interval=timedelta(seconds=30), # Changed back from 300 to 30 for more frequent updates, adjust as needed
         )
-        self.account = account
+        # Use 'username' to match CONF_USERNAME from const.py
+        self.username = username
         self.password = password
         self.mac = mac
         self.token = None
@@ -88,8 +89,9 @@ class ZinguoDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _login(self):
         """Login to Zinguo API."""
+        # Use 'username' here
         payload = {
-            "account": self.account,
+            "account": self.username, # Use the corrected instance variable
             "password": self.password
         }
 
@@ -101,9 +103,9 @@ class ZinguoDataUpdateCoordinator(DataUpdateCoordinator):
                 if not self.token:
                     _LOGGER.error("Login failed: No token received in response: %s", data)
                     raise ConfigEntryAuthFailed("Login failed: No token received")
-                _LOGGER.debug("Login successful for account: %s", self.account)
+                _LOGGER.debug("Login successful for username: %s", self.username)
             elif response.status == 401:
-                 _LOGGER.error("Login failed: Invalid credentials for account: %s", self.account)
+                 _LOGGER.error("Login failed: Invalid credentials for username: %s", self.username)
                  raise ConfigEntryAuthFailed("Invalid credentials")
             else:
                 text_response = await response.text() # Capture response body for error details
@@ -149,10 +151,11 @@ class ZinguoDataUpdateCoordinator(DataUpdateCoordinator):
             "Content-Type": "application/json"
         }
 
-        # Add common fields to payload using the stored MAC and account
+        # Add common fields to payload using the stored MAC and username
         control_payload = {
             "mac": self.mac,
-            "masterUser": self.account,
+            # Use 'username' here too
+            "masterUser": self.username, # Use the corrected instance variable
             "setParamter": False, # Verify if these defaults are correct for your API
             "action": False,      # Verify if these defaults are correct for your API
             **payload
@@ -176,7 +179,7 @@ class ZinguoDataUpdateCoordinator(DataUpdateCoordinator):
                 # Recreate the payload just in case (though unlikely to change)
                 control_payload_retry = {
                     "mac": self.mac,
-                    "masterUser": self.account,
+                    "masterUser": self.username, # Use the corrected instance variable again
                     "setParamter": False,
                     "action": False,
                     **payload
