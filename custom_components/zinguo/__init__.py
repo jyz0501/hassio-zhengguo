@@ -27,7 +27,7 @@ PLATFORMS = ["switch", "fan", "sensor"]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Zinguo from a config entry."""
-    account = entry.data[CONF_ACCOUNT]
+    account = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
     mac = entry.data[CONF_MAC]
     name = entry.data.get(CONF_NAME, "Zinguo Bathroom Fan")
