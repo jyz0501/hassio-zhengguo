@@ -17,6 +17,19 @@ from .api import ZinguoAPI  # 假设原项目有 api.py 或类似认证逻辑
 
 _LOGGER = logging.getLogger(__name__)
 
+# 自定义异常类（必须在函数使用前定义）
+class CannotConnect(HomeAssistantError):
+    """Error to indicate we cannot connect."""
+
+class InvalidAuth(HomeAssistantError):
+    """Error to indicate there is invalid auth."""
+
+class InvalidMAC(HomeAssistantError):
+    """Error to indicate MAC address is invalid."""
+
+class DeviceNotFound(HomeAssistantError):
+    """Error to indicate device not found in account."""
+
 # 配置步骤的 Schema
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
@@ -44,8 +57,14 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
         if not device:
             raise DeviceNotFound
     except Exception as ex:
-        _LOGGER.error("Zinguo login or device fetch failed: %s", ex)
-        raise CannotConnect from ex
+        # 根据异常类型抛出特定错误
+        if "auth" in str(ex).lower():
+            raise InvalidAuth from ex
+        elif "connect" in str(ex).lower() or "timeout" in str(ex).lower():
+            raise CannotConnect from ex
+        else:
+            _LOGGER.error("Zinguo login or device fetch failed: %s", ex)
+            raise CannotConnect from ex
 
     # 返回用于创建配置条目的信息
     return {"title": f"Zinguo {mac[-4:]}", "mac": mac}
@@ -88,19 +107,3 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=STEP_USER_DATA_SCHEMA,
             errors=errors,
         )
-
-
-class CannotConnect(HomeAssistantError):
-    """Error to indicate we cannot connect."""
-
-
-class InvalidAuth(HomeAssistantError):
-    """Error to indicate there is invalid auth."""
-
-
-class InvalidMAC(HomeAssistantError):
-    """Error to indicate MAC address is invalid."""
-
-
-class DeviceNotFound(HomeAssistantError):
-    """Error to indicate device not found in account."""
