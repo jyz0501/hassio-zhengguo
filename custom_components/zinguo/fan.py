@@ -17,7 +17,7 @@ from .coordinator import ZinguoDataUpdateCoordinator # Import coordinator type
 
 _LOGGER = logging.getLogger(__name__)
 
-PRESET_MODES = ["Off", "Warming 1", "Warming 2", "Wind"]
+PRESET_MODES = ["关闭", "暖风 1", "暖风 2", "吹风"]
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -44,18 +44,43 @@ class ZinguoFan(CoordinatorEntity, FanEntity):
         super().__init__(coordinator)
         self._device_info = device_info
         self._attr_unique_id = f"{device_info['id']}_fan" # Construct unique_id
-        self._attr_name = "Zinguo Fan"
+        # 限制设备名称长度，避免实体名称过长
+        device_name = coordinator.name[:32] if coordinator.name else "Zinguo"
+        self._attr_name = f"{device_name} 浴霸"
         self._attr_preset_modes = PRESET_MODES
+        # 添加对预设模式的支持
         self._attr_supported_features = FanEntityFeature.PRESET_MODE
         self._attr_device_info = {
             "identifiers": {(DOMAIN, device_info["id"])},
-            "name": coordinator.name, # Use coordinator's determined name
+            "name": device_name, # Use coordinator's determined name
             "manufacturer": "Zinguo",
-            "model": device_info.get("device_model", "Unknown Model"),
-            "sw_version": device_info.get("firmware_version", "Unknown Version"),
+            "model": device_info.get("deviceModel", "智能浴霸"),
+            "sw_version": device_info.get("firmwareVersion", "Unknown Version"),
         }
-        # Initialize state attributes
-        self._current_preset_mode = "Off"
+        # Initialize state from coordinator's data if available
+        if coordinator.data:
+            device_status = coordinator.data
+            warming1_on = device_status.get('warmingSwitch1', False)
+            warming2_on = device_status.get('warmingSwitch2', False)
+            wind_on = device_status.get('windSwitch', False)
+            
+            # Determine initial preset mode and is_on state
+            if warming1_on and not warming2_on and not wind_on:
+                self._attr_preset_mode = "暖风 1"
+                self._attr_is_on = True
+            elif warming2_on and not warming1_on and not wind_on:
+                self._attr_preset_mode = "暖风 2"
+                self._attr_is_on = True
+            elif wind_on and not warming1_on and not warming2_on:
+                self._attr_preset_mode = "吹风"
+                self._attr_is_on = True
+            else:
+                self._attr_preset_mode = "关闭"
+                self._attr_is_on = False
+        else:
+            # Default state if no data available
+            self._attr_preset_mode = "关闭"
+            self._attr_is_on = False
 
 
     @callback
@@ -63,23 +88,25 @@ class ZinguoFan(CoordinatorEntity, FanEntity):
         """Handle updated data from the coordinator."""
         # 根据协调器的最新数据更新风扇状态
         device_status = self.coordinator.data # Get fresh data
-        status_details = device_status.get('status', {}) # Adjust path if necessary
 
         # Determine current preset mode based on device status
-        warming1_on = status_details.get('warming_switch_1', False)
-        warming2_on = status_details.get('warming_switch_2', False)
-        wind_on = status_details.get('wind_switch', False)
+        warming1_on = device_status.get('warmingSwitch1', False)
+        warming2_on = device_status.get('warmingSwitch2', False)
+        wind_on = device_status.get('windSwitch', False)
 
         if warming1_on and not warming2_on and not wind_on:
-            self._current_preset_mode = "Warming 1"
+            self._attr_preset_mode = "暖风 1"
+            self._attr_is_on = True
         elif warming2_on and not warming1_on and not wind_on:
-            self._current_preset_mode = "Warming 2"
+            self._attr_preset_mode = "暖风 2"
+            self._attr_is_on = True
         elif wind_on and not warming1_on and not warming2_on:
-            self._current_preset_mode = "Wind"
+            self._attr_preset_mode = "吹风"
+            self._attr_is_on = True
         else:
-            self._current_preset_mode = "Off" # Default or Off state
+            self._attr_preset_mode = "关闭"
+            self._attr_is_on = False
 
-        self._attr_preset_mode = self._current_preset_mode
         self.async_write_ha_state() # Notify HA of state change
 
 
@@ -92,10 +119,10 @@ class ZinguoFan(CoordinatorEntity, FanEntity):
 
         # Define the control commands needed for each preset
         control_commands = {
-            "Off": {"warming_switch_1": False, "warming_switch_2": False, "wind_switch": False},
-            "Warming 1": {"warming_switch_1": True, "warming_switch_2": False, "wind_switch": False},
-            "Warming 2": {"warming_switch_1": False, "warming_switch_2": True, "wind_switch": False},
-            "Wind": {"warming_switch_1": False, "warming_switch_2": False, "wind_switch": True},
+            "关闭": {"warmingSwitch1": False, "warmingSwitch2": False, "windSwitch": False},
+            "暖风 1": {"warmingSwitch1": True, "warmingSwitch2": False, "windSwitch": False},
+            "暖风 2": {"warmingSwitch1": False, "warmingSwitch2": True, "windSwitch": False},
+            "吹风": {"warmingSwitch1": False, "warmingSwitch2": False, "windSwitch": True},
         }
 
         command_to_send = control_commands.get(preset_mode, {})
@@ -122,4 +149,4 @@ class ZinguoFan(CoordinatorEntity, FanEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the fan."""
-        await self.async_set_preset_mode("Off")
+        await self.async_set_preset_mode("关闭")
