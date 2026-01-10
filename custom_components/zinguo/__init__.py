@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from .const import DOMAIN
 from .coordinator import ZinguoDataUpdateCoordinator # 导入协调器
 
-PLATFORMS: list[Platform] = [Platform.SWITCH, Platform.FAN, Platform.SENSOR, Platform.BUTTON]
+PLATFORMS: list[Platform] = [Platform.SWITCH, Platform.FAN, Platform.SENSOR, Platform.BUTTON, Platform.NUMBER, Platform.SELECT]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # 初始化协调器（首次刷新），获取设备实际状态
     _LOGGER.debug("Fetching initial device state...")
-    await coordinator.async_config_entry_first_refresh()
+    await coordinator.async_refresh()
     
     if coordinator.data:
         _LOGGER.info("Successfully fetched initial device state for %s", coordinator.name)
