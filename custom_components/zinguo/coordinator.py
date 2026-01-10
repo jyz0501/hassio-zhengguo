@@ -33,10 +33,65 @@ class ZinguoDataUpdateCoordinator(DataUpdateCoordinator):
         self.password = password
         self.mac = mac
         self.token = None
+        # API endpoint management
+        self._base_url = None  # Will be set during login
         # 创建共享会话，禁用SSL验证以解决证书过期问题
         conn = aiohttp.TCPConnector(ssl=False)
         self._session = aiohttp.ClientSession(connector=conn)
         self.devices = [] # Store devices list for config flow
+
+    async def _test_endpoint(self, base_url):
+        """Test if a given API endpoint is working by attempting login."""
+        import hashlib
+        encrypted_password = hashlib.sha1(self.password.encode()).hexdigest()
+        
+        payload = {
+            "account": self.username,
+            "password": encrypted_password
+        }
+
+        headers = {
+            "Content-Type": "text/plain;charset=UTF-8",
+            "User-Agent": "峥果智能/2 CFNetwork/3860.200.71 Darwin/25.1.0",
+            "Accept": "*/*",
+            "Accept-Language": "zh-cn",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive"
+        }
+
+        login_url = f"{base_url}/customer/login"
+        _LOGGER.debug("Testing endpoint: %s", base_url)
+        
+        try:
+            async with self._session.post(login_url, json=payload, headers=headers) as response:
+                response_text = await response.text()
+                _LOGGER.debug("Endpoint %s response status: %d", base_url, response.status)
+                
+                if response.status == 200:
+                    # Try to parse JSON to verify valid response
+                    import json
+                    data = json.loads(response_text)
+                    if "token" in data:
+                        _LOGGER.debug("Endpoint %s is working", base_url)
+                        return True, data["token"]
+                return False, None
+        except Exception as ex:
+            _LOGGER.debug("Endpoint %s test failed: %s", base_url, ex)
+            return False, None
+
+    async def _find_working_endpoint(self):
+        """Find a working API endpoint from the list."""
+        from .const import API_ENDPOINTS
+        
+        # Try each endpoint
+        for endpoint in API_ENDPOINTS:
+            is_working, token = await self._test_endpoint(endpoint)
+            if is_working:
+                _LOGGER.info("Found working endpoint: %s", endpoint)
+                return endpoint, token
+        
+        _LOGGER.error("No working API endpoint found")
+        raise Exception("No working API endpoint found")
 
     async def async_get_devices(self):
         """Get all devices for the user. Used in config flow."""
@@ -48,6 +103,12 @@ class ZinguoDataUpdateCoordinator(DataUpdateCoordinator):
                     await self._login()
                     _LOGGER.debug("Login successful, got token: %s", self.token[:10] + "..." if self.token else "None")
 
+                # Use the detected base url or fallback to const BASE_URL
+                from .const import DEVICES_URL as const_devices_url
+                from .const import BASE_URL as const_base_url
+                base_url = self._base_url if hasattr(self, '_base_url') and self._base_url else const_base_url
+                devices_url = f"{base_url}/customer/devices"
+
                 headers = {
                     "x-access-token": self.token,
                     "User-Agent": "峥果智能/2 CFNetwork/3860.200.71 Darwin/25.1.0",
@@ -57,10 +118,10 @@ class ZinguoDataUpdateCoordinator(DataUpdateCoordinator):
                     "Connection": "keep-alive"
                 }
                 
-                _LOGGER.debug("Attempting to get devices from %s", DEVICES_URL)
+                _LOGGER.debug("Attempting to get devices from %s", devices_url)
                 _LOGGER.debug("Devices request headers: %s", dict(headers))
                 
-                async with self._session.get(DEVICES_URL, headers=headers) as response:
+                async with self._session.get(devices_url, headers=headers) as response:
                     _LOGGER.debug("Devices response status: %d", response.status)
                     _LOGGER.debug("Devices response headers: %s", dict(response.headers))
                     
@@ -155,6 +216,10 @@ class ZinguoDataUpdateCoordinator(DataUpdateCoordinator):
             "warmingSwitch2": status_map.get(raw_data.get("warmingSwitch2"), False),
             "windSwitch": status_map.get(raw_data.get("windSwitch"), False),
             "ventilationSwitch": status_map.get(raw_data.get("ventilationSwitch"), False),
+            "ventilationAutoClose": raw_data.get("ventilationAutoClose"),
+            "overHeatAutoClose": raw_data.get("overHeatAutoClose"),
+            "warmingAutoClose": raw_data.get("warmingAutoClose"),
+            "lightAutoClose": raw_data.get("lightAutoClose"),
             "comovement": raw_data.get("comovement"),
             "hardwareVersion": raw_data.get("hardwareVersion"),
             "softwareVersion": raw_data.get("softwareVersion"),
@@ -165,11 +230,18 @@ class ZinguoDataUpdateCoordinator(DataUpdateCoordinator):
         return processed
 
     async def _login(self):
-        """Login to Zinguo API."""
+        """Login to Zinguo API using endpoint detection."""
         # 根据抓包数据，密码需要进行SHA-1加密
         import hashlib
         encrypted_password = hashlib.sha1(self.password.encode()).hexdigest()
         
+        # Find a working endpoint first
+        if not self._base_url:
+            self._base_url, self.token = await self._find_working_endpoint()
+            _LOGGER.debug("Login using detected endpoint: %s", self._base_url)
+            return  # Token already obtained from _find_working_endpoint
+        
+        # If we already have a base_url, use it directly
         payload = {
             "account": self.username, # Use the corrected instance variable
             "password": encrypted_password
@@ -185,11 +257,12 @@ class ZinguoDataUpdateCoordinator(DataUpdateCoordinator):
             "Connection": "keep-alive"
         }
 
-        _LOGGER.debug("Attempting login to %s with username: %s", LOGIN_URL, self.username)
+        login_url = f"{self._base_url}/customer/login"
+        _LOGGER.debug("Attempting login to %s with username: %s", login_url, self.username)
         _LOGGER.debug("Login payload: %s", payload)
 
         # Use the shared session
-        async with self._session.post(LOGIN_URL, json=payload, headers=headers) as response:
+        async with self._session.post(login_url, json=payload, headers=headers) as response:
             _LOGGER.debug("Login response status: %d", response.status)
             _LOGGER.debug("Login response headers: %s", dict(response.headers))
             
@@ -237,8 +310,10 @@ class ZinguoDataUpdateCoordinator(DataUpdateCoordinator):
             "Connection": "keep-alive"
         }
         
+        # 使用检测到的base_url或默认值
+        base_url = self._base_url if hasattr(self, '_base_url') and self._base_url else getattr(self, 'base_url', GET_DEVICE_URL.rsplit('/', 1)[0])
         # 使用抓包数据中的正确端点，通过查询参数传递mac
-        url = f"{GET_DEVICE_URL}?mac={self.mac}"
+        url = f"{base_url}/device/getDeviceByMac?mac={self.mac}"
 
         # Use the shared session
         async with self._session.get(url, headers=headers) as response:
@@ -329,8 +404,12 @@ class ZinguoDataUpdateCoordinator(DataUpdateCoordinator):
 
         _LOGGER.debug("Sending control command: %s", control_payload)
 
+        # 使用检测到的base_url或默认值
+        base_url = self._base_url if hasattr(self, '_base_url') and self._base_url else getattr(self, 'base_url', CONTROL_URL.rsplit('/', 1)[0])
+        control_url = f"{base_url}/wifiyuba/yuBaControl"
+        
         # Use the shared session
-        async with self._session.put(CONTROL_URL, json=control_payload, headers=headers) as response:
+        async with self._session.put(control_url, json=control_payload, headers=headers) as response:
             _LOGGER.debug("Control command response status: %d", response.status)
             _LOGGER.debug("Control command response headers: %s", dict(response.headers))
             
@@ -340,21 +419,12 @@ class ZinguoDataUpdateCoordinator(DataUpdateCoordinator):
             if response.status == 200:
                 _LOGGER.debug("Control command sent successfully.")
                 
-                # Extract and process the response to get the actual device status
-                # This ensures we get the latest status immediately after command
-                try:
-                    response_data = json.loads(response_text)
-                    if "device" in response_data:
-                        # Update local data immediately for better user experience (optimistic update)
-                        device_data = response_data["device"]
-                        processed_data = self._process_device_data(device_data)
-                        # Update the coordinator's data directly
-                        self.data = processed_data
-                        # Notify all listeners of the update
-                        self.async_update_listeners()
-                        _LOGGER.debug("Optimistic update with response data: %s", processed_data)
-                except json.JSONDecodeError:
-                    _LOGGER.debug("Response is not JSON, cannot do optimistic update")
+                # Don't use the device status from response, it's incomplete and has different format
+                # Instead, refresh the data to get complete and accurate status including temperature
+                # Update self.data with the fresh data
+                self.data = await self._async_update_data()
+                # Notify all listeners of the update
+                self.async_update_listeners()
                 return True
             elif response.status == 401:
                 # Token expired, re-login and retry once
@@ -372,27 +442,23 @@ class ZinguoDataUpdateCoordinator(DataUpdateCoordinator):
                     "Connection": "keep-alive"
                 }
                 
-                async with self._session.put(CONTROL_URL, json=control_payload, headers=new_headers) as retry_resp:
+                # 使用更新后的base_url
+                base_url = self._base_url if hasattr(self, '_base_url') and self._base_url else getattr(self, 'base_url', CONTROL_URL.rsplit('/', 1)[0])
+                control_url = f"{base_url}/wifiyuba/yuBaControl"
+                
+                async with self._session.put(control_url, json=control_payload, headers=new_headers) as retry_resp:
                     retry_text_response = await retry_resp.text()
                     _LOGGER.debug("Control command retry response: %d, %s", retry_resp.status, retry_text_response)
                     
                     if retry_resp.status == 200:
                         _LOGGER.debug("Control command sent successfully after re-login.")
                         
-                        # Extract and process the response to get the actual device status
-                        try:
-                            retry_response_data = json.loads(retry_text_response)
-                            if "device" in retry_response_data:
-                                # Update local data immediately for better user experience (optimistic update)
-                                device_data = retry_response_data["device"]
-                                processed_data = self._process_device_data(device_data)
-                                # Update the coordinator's data directly
-                                self.data = processed_data
-                                # Notify all listeners of the update
-                                self.async_update_listeners()
-                                _LOGGER.debug("Optimistic update with retry response data: %s", processed_data)
-                        except json.JSONDecodeError:
-                            _LOGGER.debug("Retry response is not JSON, cannot do optimistic update")
+                        # Don't use the device status from response, it's incomplete and has different format
+                        # Instead, refresh the data to get complete and accurate status including temperature
+                        # Update self.data with the fresh data
+                        self.data = await self._async_update_data()
+                        # Notify all listeners of the update
+                        self.async_update_listeners()
                         return True
                     else:
                         _LOGGER.error("Control command failed after re-login, status %d: %s", retry_resp.status, retry_text_response)
