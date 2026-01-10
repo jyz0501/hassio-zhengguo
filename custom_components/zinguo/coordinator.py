@@ -392,31 +392,28 @@ class ZinguoDataUpdateCoordinator(DataUpdateCoordinator):
             })
         else:
             # For switch commands, include complete switch status
+            # Initialize with current states from latest data if available
+            status_map = {True: 1, False: 0}
             current_status = {
-                "warmingSwitch1": 0,
-                "warmingSwitch2": 0,
-                "windSwitch": 0,
-                "lightSwitch": 0,
-                "ventilationSwitch": 0,
+                "warmingSwitch1": status_map.get(current_data.get("warmingSwitch1"), 0) if current_data else 0,
+                "warmingSwitch2": status_map.get(current_data.get("warmingSwitch2"), 0) if current_data else 0,
+                "windSwitch": status_map.get(current_data.get("windSwitch"), 0) if current_data else 0,
+                "lightSwitch": status_map.get(current_data.get("lightSwitch"), 0) if current_data else 0,
+                "ventilationSwitch": status_map.get(current_data.get("ventilationSwitch"), 0) if current_data else 0,
                 "turnOffAll": 0
             }
             
-            if current_data:
-                # Update with current switch states
-                status_map = {True: 1, False: 0}
-                current_status.update({
-                    "warmingSwitch1": status_map.get(current_data.get("warmingSwitch1"), 0),
-                    "warmingSwitch2": status_map.get(current_data.get("warmingSwitch2"), 0),
-                    "windSwitch": status_map.get(current_data.get("windSwitch"), 0),
-                    "lightSwitch": status_map.get(current_data.get("lightSwitch"), 0),
-                    "ventilationSwitch": status_map.get(current_data.get("ventilationSwitch"), 0),
-                    "turnOffAll": 0
-                })
+            # Apply the requested changes first
+            updated_status = {**current_status, **converted_payload}
             
-            control_payload.update({
-                **current_status,
-                **converted_payload
-            })
+            # Handle switch dependencies and comovement logic
+            # 1. If any warming is on, wind must be on
+            if updated_status["warmingSwitch1"] == 1 or updated_status["warmingSwitch2"] == 1:
+                updated_status["windSwitch"] = 1
+            # 2. If both warmings are off, wind should stay as requested (don't auto-off)
+            # 3. Lighting doesn't affect other switches
+            
+            control_payload.update(updated_status)
 
         _LOGGER.debug("Sending control command: %s", control_payload)
 
