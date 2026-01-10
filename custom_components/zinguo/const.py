@@ -8,8 +8,14 @@ CONF_PASSWORD = "password"
 CONF_MAC = "mac"
 CONF_NAME = "name"
 
-# API configuration
-BASE_URL = "https://iot2.zinguo.com/api/v1"
+# API configuration - Multiple endpoints for fallback
+API_ENDPOINTS = [
+    "https://iot.zinguo.com/api/v1",
+    "https://iot2.zinguo.com/api/v1"
+]
+
+# Default endpoint (will be updated by coordinator if another works better)
+BASE_URL = API_ENDPOINTS[0]
 LOGIN_URL = f"{BASE_URL}/customer/login"
 DEVICES_URL = f"{BASE_URL}/customer/devices"
 GET_DEVICE_URL = f"{BASE_URL}/device/getDeviceByMac"
