@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from .const import DOMAIN
 from .coordinator import ZinguoDataUpdateCoordinator # 导入协调器
 
-PLATFORMS: list[Platform] = [Platform.SWITCH, Platform.FAN, Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.SWITCH, Platform.FAN, Platform.SENSOR, Platform.BUTTON]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,16 +22,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = ZinguoDataUpdateCoordinator(
         hass=hass,
         username=entry.data["username"],
-        password=entry.data["password"]
+        password=entry.data["password"],
+        mac=entry.data["mac"],
+        name=entry.data["name"]
     )
 
     # 将协调器实例存储到 hass.data 中
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
-    # 初始化协调器（首次刷新）
+    # 初始化协调器（首次刷新），获取设备实际状态
+    _LOGGER.debug("Fetching initial device state...")
     await coordinator.async_config_entry_first_refresh()
+    
+    if coordinator.data:
+        _LOGGER.info("Successfully fetched initial device state for %s", coordinator.name)
+        _LOGGER.debug("Initial device state: %s", coordinator.data)
+    else:
+        _LOGGER.warning("Failed to fetch initial device state, using default values")
 
-    # 加载平台
+    # 加载平台，此时coordinator.data已包含最新设备状态
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
