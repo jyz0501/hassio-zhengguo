@@ -9,9 +9,10 @@ CONF_MAC = "mac"
 CONF_NAME = "name"
 
 # API configuration
-BASE_URL = "https://iot.zinguo.com/api/v1"
+BASE_URL = "https://iot2.zinguo.com/api/v1"
 LOGIN_URL = f"{BASE_URL}/customer/login"
 DEVICES_URL = f"{BASE_URL}/customer/devices"
+GET_DEVICE_URL = f"{BASE_URL}/device/getDeviceByMac"
 CONTROL_URL = f"{BASE_URL}/wifiyuba/yuBaControl"
 
 # Switch types
